@@ -1,2 +1,6 @@
-.env
-node_modules/
+/.gradle
+/local.properties
+/captures/
+/key.properties
+**/*.keystore
+**/*.jks
