@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download Project
+      - name: Checkout Project
         uses: actions/checkout@v4
 
       - name: Setup Java
@@ -30,19 +30,54 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Check Flutter
-        run: flutter --version
+      - name: Find Flutter Project
+        shell: bash
+        run: |
+          PUBSPEC=$(find . -name pubspec.yaml \
+            -not -path '*/.dart_tool/*' \
+            -not -path '*/.pub-cache/*' \
+            -print -quit)
+
+          if [ -z "$PUBSPEC" ]; then
+            echo "ERROR: pubspec.yaml not found!"
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$PUBSPEC")
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+          echo "Flutter project found: $PROJECT_DIR"
+
+      - name: Check Main Dart File
+        shell: bash
+        run: |
+          cd "$PROJECT_DIR"
+
+          echo "Project files:"
+          ls -la
+          echo "Lib folder:"
+          ls -la lib || true
+
+          if [ ! -f lib/main.dart ]; then
+            echo "ERROR: lib/main.dart not found!"
+            echo "Please add your Flutter app entry file."
+            exit 1
+          fi
 
       - name: Install Dependencies
-        run: flutter pub get
+        run: |
+          cd "$PROJECT_DIR"
+          flutter pub get
 
       - name: Build Release APK
-        run: flutter build apk --release --verbose
+        run: |
+          cd "$PROJECT_DIR"
+          flutter build apk --release --target lib/main.dart
 
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: My-Android-APK
-          path: build/app/outputs/flutter-apk/*.apk
+          name: My-Flutter-APK
+          path: ${{ env.PROJECT_DIR }}/build/app/outputs/flutter-apk/*.apk
           if-no-files-found: error
+          
