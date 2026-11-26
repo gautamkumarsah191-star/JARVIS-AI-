@@ -1,6 +1,9 @@
-name: Unpack and Build JARVIS APK
+name: Flutter APK Build
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -8,46 +11,38 @@ permissions:
 
 jobs:
   build:
+    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Download Project
         uses: actions/checkout@v4
 
-      - name: Extract JARVIS project ZIP
-        shell: bash
-        run: |
-          ZIP_FILE=$(find . -maxdepth 1 -type f -iname '*.zip' | head -n 1)
-          if [ -z "$ZIP_FILE" ]; then
-            echo "Project ZIP not found"
-            exit 1
-          fi
-          mkdir -p "$RUNNER_TEMP/jarvis-src"
-          unzip -o "$ZIP_FILE" -d "$RUNNER_TEMP/jarvis-src"
-          cp -a "$RUNNER_TEMP/jarvis-src/." .
-          test -f app/pubspec.yaml
-
-      - name: Set up Java
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          cache: true
 
-      - name: Build APK
-        working-directory: app
-        run: |
-          flutter pub get
-          flutter build apk --release
+      - name: Check Flutter
+        run: flutter --version
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Release APK
+        run: flutter build apk --release --verbose
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: jarvis-release-apk
-          path: app/build/app/outputs/flutter-apk/app-release.apk
+          name: My-Android-APK
+          path: build/app/outputs/flutter-apk/*.apk
           if-no-files-found: error
-          
