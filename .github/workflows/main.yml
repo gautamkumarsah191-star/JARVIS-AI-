@@ -1,4 +1,4 @@
-name: Flutter APK Build
+name: JARVIS AI - Build APK
 
 on:
   push:
@@ -11,73 +11,101 @@ permissions:
 
 jobs:
   build:
-    name: Build Android APK
+    name: Build JARVIS AI APK
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Download GitHub project
       - name: Checkout Project
         uses: actions/checkout@v4
 
+      # 2. Install Java
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
+      # 3. Install Flutter
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
 
-      - name: Find Flutter Project
-        shell: bash
+      # 4. Check project
+      - name: Check Project Files
         run: |
-          PUBSPEC=$(find . -name pubspec.yaml \
-            -not -path '*/.dart_tool/*' \
-            -not -path '*/.pub-cache/*' \
-            -print -quit)
+          echo "JARVIS AI Project"
+          ls -la
 
-          if [ -z "$PUBSPEC" ]; then
-            echo "ERROR: pubspec.yaml not found!"
+          if [ ! -f pubspec.yaml ]; then
+            echo "ERROR: pubspec.yaml missing!"
             exit 1
           fi
 
-          PROJECT_DIR=$(dirname "$PUBSPEC")
-          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
-          echo "Flutter project found: $PROJECT_DIR"
-
-      - name: Check Main Dart File
+      # 5. Fix Dart file location
+      - name: Fix Flutter Lib Folder
         shell: bash
         run: |
-          cd "$PROJECT_DIR"
+          mkdir -p lib
 
-          echo "Project files:"
-          ls -la
-          echo "Lib folder:"
-          ls -la lib || true
+          if [ ! -f lib/main.dart ] && [ -f main.dart ]; then
+            for file in ./*.dart; do
+              if [ -f "$file" ]; then
+                cp "$file" lib/
+              fi
+            done
+          fi
 
           if [ ! -f lib/main.dart ]; then
-            echo "ERROR: lib/main.dart not found!"
-            echo "Please add your Flutter app entry file."
+            echo "ERROR: main.dart not found!"
             exit 1
           fi
 
+          echo "Flutter source files:"
+          ls -la lib/
+
+      # 6. Generate Android project if missing
+      - name: Setup Android Project
+        run: |
+          if [ ! -d android ]; then
+            flutter create \
+              --platforms=android \
+              --project-name jarvis_ai .
+          fi
+
+          if [ ! -d android/app ]; then
+            echo "ERROR: Android project missing!"
+            exit 1
+          fi
+
+      # 7. Get dependencies
       - name: Install Dependencies
-        run: |
-          cd "$PROJECT_DIR"
-          flutter pub get
+        run: flutter pub get
 
+      # 8. Build APK
       - name: Build Release APK
+        shell: bash
         run: |
-          cd "$PROJECT_DIR"
-          flutter build apk --release --target lib/main.dart
+          set -o pipefail
+          flutter build apk --release 2>&1 | tee flutter-build.log
 
-      - name: Upload APK
+      # 9. Upload APK
+      - name: Upload JARVIS APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: My-Flutter-APK
-          path: ${{ env.PROJECT_DIR }}/build/app/outputs/flutter-apk/*.apk
+          name: JARVIS-AI-APK
+          path: build/app/outputs/flutter-apk/*.apk
           if-no-files-found: error
+
+      # 10. Save error log if build fails
+      - name: Upload Build Error Log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: JARVIS-Build-Error-Log
+          path: flutter-build.log
+          if-no-files-found: ignore
           
